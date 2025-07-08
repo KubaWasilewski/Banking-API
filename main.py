@@ -1,43 +1,28 @@
-#import libraries
-import psycopg2
+import uvicorn
+from typing import List
 from fastapi import FastAPI
-from uuid import UUID, uuid4
-import hashlib
-from datetime import datetime
+from sqlalchemy.orm import Session
+from sqlalchemy import select, create_engine
+from models import Person, Account
+from schemas import Person_scheme, Account_scheme
 
-def db_setup():
-    #connect to local db server 
-    conn = psycopg2.connect(host = "localhost", dbname = "postgres", user = "postgres", password = "dbpass", port = 5432)
-    cur = conn.cursor()    
 
-    #create tables
-    cur.execute("""CREATE TABLE IF NOT EXISTS person (
-                id UUID PRIMARY KEY, 
-                name VARCHAR(128) NOT NULL, 
-                surname VARCHAR(128) NOT NULL, 
-                email VARCHAR(128) NOT NULL,
-                hashedPassword_hex VARCHAR(64) NOT NULL,
-                createdAt DATE NOT NULL 
-                );""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS account (
-                id UUID PRIMARY KEY,
-                ownerId UUID NOT NULL, 
-                name VARCHAR(128) NOT NULL, 
-                description VARCHAR(512),
-                balance NUMERIC(12, 2) NOT NULL,
-                createdAt DATE NOT NULL,
-                CONSTRAINT fk_person FOREIGN KEY (ownerId)
-                REFERENCES person(id)
-                );""")
 
-    conn.commit()
+app = FastAPI()
 
-    return conn, cur
+@app.get("/getAll/", response_model = List[Person_scheme])
+def red_all_users():
+    user_list = []
+    with Session(engine) as sess:
+        stmt = select(Person)
+        res = sess.scalars(stmt)
+        for u in res:
+            user_list.append(u)
+    return user_list
 
-#execute code if file name main
+
 if __name__ == "__main__":
-    print("start")
-    conn, cur = db_setup()
-    cur.close()
-    conn.close()
+    engine = create_engine("postgresql://postgres:dbpass@localhost:5432/postgres")
+
+    uvicorn.run(app, host = "127.0.0.1", port=8000)
     print("exit")
