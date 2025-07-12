@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Numeric, Integer
+from sqlalchemy import String, ForeignKey, Numeric
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 import datetime
 from uuid import UUID
