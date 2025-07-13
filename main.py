@@ -42,12 +42,12 @@ def authenticate_user(db: Session, email: str, password: str):
     query = select(Person).where(Person.email == email)
     query_result = db.scalars(query).first()
     if query_result == None:
-        return False
+        return query_result
     else:
         if hashlib.sha256(password.encode()).hexdigest() == query_result.hashed_password_hex:
-            return True
+            return query_result
         else:
-            return False
+            return None
 
 
 # create JWT token
@@ -93,13 +93,10 @@ def verify_token(token: str = Depends(extract_token)):
 
 @app.get("/get-users/", response_model=List[Person_scheme])
 def red_all_users(db: Session = Depends(get_db), _=Depends(verify_token)):
-    user_list = []
     query = select(Person)
     query_result = db.scalars(query)
-    for u in query_result:
-        user_list.append(u)
 
-    return user_list
+    return query_result
 
 
 @app.post("/register/", response_model=Person_scheme)
@@ -108,7 +105,6 @@ def register_user(person_register: Person_register, db: Session = Depends(get_db
     created_at = datetime.datetime.now(datetime.timezone.utc).date()
     person = Person(id=uuid4(), name=person_register.name, surname=person_register.surname,
                     email=person_register.email, hashed_password_hex=hashed_pass, created_at=created_at)
-    # person_scheme = Person_scheme.model_validate(person)
     db.add(person)
     try:
         db.commit()
@@ -123,23 +119,21 @@ def register_user(person_register: Person_register, db: Session = Depends(get_db
 
 @app.post("/login/", response_model=Token_scheme)
 def login_user(person_login: Person_login, db: Session = Depends(get_db)):
-    user_auth = authenticate_user(
+    query_result = authenticate_user(
         db, person_login.email, person_login.password)
-    if not user_auth:
+    if query_result == None:
         raise HTTPException(status_code=401, detail="invalid credentials")
     else:
-        query = select(Person).where(Person.email == person_login.email)
-        query_result = db.scalars(query).first()
         person_id = str(query_result.id)
         access_token = create_access_token(data={"sub": person_id})
-
         access_token = Token_scheme(
             access_token=access_token, token_type="Bearer")
+
         return access_token
 
 
-@app.post("/register-account", response_model=Account_scheme)
-def register_accoumt(account_register: Account_register, db: Session = Depends(get_db), person_id: UUID = Depends(verify_token)):
+@app.post("/register-account/", response_model=Account_scheme)
+def register_accoumt(account_register: Account_register, db: Session = Depends(get_db), person_id: str = Depends(verify_token)):
     created_at = datetime.datetime.now(datetime.timezone.utc).date()
     account = Account(id=uuid4(), owner_id=person_id, name=account_register.name,
                       description=account_register.description, balance=0.0, created_at=created_at)
@@ -152,25 +146,46 @@ def register_accoumt(account_register: Account_register, db: Session = Depends(g
 
 
 @app.get("/get-accounts/", response_model=List[Account_scheme])
-def read_all_account(db: Session = Depends(get_db), person_id: UUID = Depends(verify_token)):
-    account_list = []
-
+def read_all_account(db: Session = Depends(get_db), person_id: str = Depends(verify_token)):
     query = select(Account).where(Account.owner_id == person_id)
     query_result = db.scalars(query)
-    for a in query_result:
-        account_list.append(a)
 
-    return account_list
+    return query_result
 
 
-@app.put("/update-account")
-def update_account():
-    pass
+@app.put("/update-account/{account_id}/", response_model=Account_scheme)
+def update_account(account_id: UUID, account: Account_update, db: Session = Depends(get_db), person_id: str = Depends(verify_token)):
+    query = select(Account).where(Account.id == account_id)
+    query_result = db.scalars(query).first()
+    if query_result == None:
+        raise HTTPException(
+            status_code=404, detail="account with given id does not exist")
+    elif str(query_result.owner_id) != person_id:
+        raise HTTPException(
+            status_code=401, detail="you do not have access to that account")
+
+    query_result.balance = account.balance
+    db.commit()
+    db.refresh(query_result)
+
+    return query_result
 
 
-@app.delete("/delete-account/")
-def delete_account():
-    pass
+@app.delete("/delete-account/{account_id}/", response_model=Account_scheme)
+def delete_account(account_id: UUID, db: Session = Depends(get_db), person_id: str = Depends(verify_token)):
+    query = select(Account).where(Account.id == account_id)
+    query_result = db.scalars(query).first()
+    if query_result == None:
+        raise HTTPException(
+            status_code=404, detail="account with given id does not exist")
+    elif str(query_result.owner_id) != person_id:
+        raise HTTPException(
+            status_code=401, detail="you do not have access to that account")
+
+    db.delete(query_result)
+    db.commit()
+
+    return query_result
 
 
 if __name__ == "__main__":

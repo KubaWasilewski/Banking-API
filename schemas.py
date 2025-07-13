@@ -1,6 +1,7 @@
+import datetime
 from pydantic import BaseModel, model_validator, EmailStr
 from typing import Optional
-import datetime
+from uuid import UUID
 
 
 class Token_scheme(BaseModel):
@@ -19,6 +20,7 @@ class Person_scheme(BaseModel):
 
 
 class Account_scheme(BaseModel):
+    id: UUID
     name: str
     description: Optional[str]
     balance: float
@@ -61,3 +63,7 @@ class Account_register(BaseModel):
         if not self.name.strip():
             raise ValueError("name can't be blank")
         return self
+
+
+class Account_update(BaseModel):
+    balance: float

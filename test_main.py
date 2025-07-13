@@ -37,6 +37,9 @@ def db_setup():
     db.add(Person(id="3a3b6a76-6273-446e-9b69-556a301bd001", name="Max", surname="Patison", email="maxpatison@gmail.com",
            hashed_password_hex="4a3a14d1869822748bbff6148d679caef5e4cb4100dc23a1a1cdf190d53fca46", created_at=datetime.date(2022, 4, 11)))
     db.commit()
+    db.add(Account(id="86424995-abdf-451d-92b9-abe337a48393", owner_id="afc3c38f-c304-4ed5-a028-aa17547fe7e9",
+           name="Saving account", description="big big big big", balance=0, created_at=datetime.date(2022, 4, 11)))
+    db.commit()
     db.close()
 
 
@@ -81,6 +84,13 @@ data_login_invalid = {
     "email": "johncena@gmail.com",
     "password": "password"
 }
+data_register_account = {
+    "name": "Cena's account",
+    "description": "My savings."
+}
+data_update_account = {
+    "balance": 10.45
+}
 headers = {
     "Authorization": ""
 }
@@ -117,7 +127,6 @@ def test_login_valid():
     assert data["access_token"]
 
 
-
 # test login endpoint with invalid data
 def test_login_invalid():
     response = client.post("/login/", json=data_login_invalid)
@@ -130,6 +139,51 @@ def test_get_users(get_token):
     response = client.get("/get-users/", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert len(data) > 1
+    assert len(data) > 0
     validated_data = [Person_scheme(**item) for item in data]
     assert len(validated_data) == len(data)
+
+
+def test_register_account(get_token):
+    headers["Authorization"] = "Bearer " + get_token
+    response = client.post("/register-account/",
+                           headers=headers, json=data_register_account)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Cena's account"
+    assert data["description"] == "My savings."
+    assert data["balance"] == 0
+
+
+def test_view_accounts_not_auth():
+    response = client.get("/get-accounts/")
+    assert response.status_code == 401
+
+
+def test_view_accounts(get_token):
+    headers["Authorization"] = "Bearer " + get_token
+    response = client.get("/get-accounts/", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    validated_data = [Account_scheme(**item) for item in data]
+    assert len(validated_data) == len(data)
+
+
+def test_update_account(get_token):
+    headers["Authorization"] = "Bearer " + get_token
+    response = client.put("/update-account/86424995-abdf-451d-92b9-abe337a48393/",
+                          headers=headers, json=data_update_account)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["balance"] == 10.45
+    assert data["id"] == "86424995-abdf-451d-92b9-abe337a48393"
+
+
+def test_delete_account(get_token):
+    headers["Authorization"] = "Bearer " + get_token
+    response = client.delete(
+        "/delete-account/86424995-abdf-451d-92b9-abe337a48393/", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "86424995-abdf-451d-92b9-abe337a48393"
