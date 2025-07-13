@@ -2,7 +2,7 @@ import pytest
 import jwt
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from main import app, get_db
 from typing import List
 from models import *
@@ -108,6 +108,13 @@ def test_valid_register():
     assert data["email"] == "testuser@gmail.com"
     assert data["created_at"] == str(
         datetime.datetime.now(datetime.timezone.utc).date())
+    db = override_get_db()
+    db = next(db)
+    query = select(Person).where(Person.email == "testuser@gmail.com")
+    query_result = db.scalars(query).first()
+    db.close()
+    assert query_result != None
+
 
 
 # test register endpoint with existing user
@@ -153,6 +160,12 @@ def test_register_account(get_token):
     assert data["name"] == "Cena's account"
     assert data["description"] == "My savings."
     assert data["balance"] == 0
+    db = override_get_db()
+    db = next(db)
+    query = select(Account).where(Account.id == data["id"])
+    query_result = db.scalars(query).first()
+    db.close()
+    assert query_result != None
 
 
 def test_view_accounts_not_auth():
@@ -178,6 +191,12 @@ def test_update_account(get_token):
     data = response.json()
     assert data["balance"] == 10.45
     assert data["id"] == "86424995-abdf-451d-92b9-abe337a48393"
+    db = override_get_db()
+    db = next(db)
+    query = select(Account).where(Account.id == "86424995-abdf-451d-92b9-abe337a48393")
+    query_result = db.scalars(query).first()
+    db.close()
+    assert str(query_result.balance) == "10.45"
 
 
 def test_delete_account(get_token):
@@ -187,3 +206,9 @@ def test_delete_account(get_token):
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "86424995-abdf-451d-92b9-abe337a48393"
+    db = override_get_db()
+    db = next(db)
+    query = select(Account).where(Account.id == "86424995-abdf-451d-92b9-abe337a48393")
+    query_result = db.scalars(query).first()
+    db.close()
+    assert query_result == None
