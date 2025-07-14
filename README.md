@@ -1,4 +1,4 @@
-A secure and modern RESTfulAPI built wiht Fastapi that simulates banking operations.
+A secure and modern RESTfulAPI built with Fastapi that simulates banking operations.
 Users can register, authenticate, open and manage accounts.
 
 
